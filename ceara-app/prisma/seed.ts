@@ -10,8 +10,8 @@ const main = async () => {
     const restaurant = await tx.restaurant.create({
       data: {
         name: "Ceara Burguer Açaí",
-        slug: "ceara-app",
-        description: "Os melhores açaís e sanduíches do mundo",
+        slug: "Ceará Açaí Burguer",
+        description: "O melhor açaí de Belo Horizonte",
         avatarImageUrl:
           "https://u9a6wmr3as.ufs.sh/f/jppBrbk0cChQvcNP9rHlEJu1vCY5kLqzjf29HKaeN78Z6pRy",
         coverImageUrl:
