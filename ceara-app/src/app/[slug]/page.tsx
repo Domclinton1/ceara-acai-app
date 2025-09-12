@@ -18,7 +18,7 @@ const RestaurantPage = async ({ params }: RestaurantPageProps) => {
   }
 
   return (
-    <div className="bg-purple-700 h-screen flex flex-col items-center justify-center px-6 pt-24">
+    <div className="bg-purple-700 h-screen flex flex-col items-center justify-center px-6 pt-14">
       <div className="flex flex-col items-center gap-2">
         <Image
           src="/logo.png"
@@ -31,7 +31,7 @@ const RestaurantPage = async ({ params }: RestaurantPageProps) => {
           {restaurant.name}
         </h2>
       </div>
-      <div className="pt-24 text-center space-y-2">
+      <div className="pt-14 text-center space-y-2">
         <h3 className="text-2xl font-semibold text-yellow-300 uppercase">
           Seja bem vindo ao Ceará Açaí Burguer App
         </h3>
@@ -40,18 +40,18 @@ const RestaurantPage = async ({ params }: RestaurantPageProps) => {
           praticidade e sabor em cada detalhe
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-4 pt-2 pb-4">
+      <div className="grid grid-cols-2 gap-4 pt-2">
         <ConsumptionMethodOption
           slug={slug}
           option={"DINE_IN"}
-          buttonText="Para comer aqui"
+          buttonText="Comer aqui"
           imageAlt="Para comer o lanche no restaurante"
           imageUrl="/dine_in.png"
         />
         <ConsumptionMethodOption
           slug={slug}
           option={"TAKEAWAY"}
-          buttonText="Para levar para casa"
+          buttonText="Retirar aqui"
           imageAlt="Para levar seu lanche para casa"
           imageUrl="/takeaway.png"
         />
