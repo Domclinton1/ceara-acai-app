@@ -11,17 +11,20 @@ import {
 import { CartContext } from "../../cart";
 
 const CartSheet = () => {
-  const { isOpen, toggleCart } = useContext(CartContext);
+  const { isOpen, toggleCart, products } = useContext(CartContext);
   return (
     <Sheet open={isOpen} onOpenChange={toggleCart}>
-      <SheetHeader>
-        <SheetContent>
-          <SheetHeader>
-            <SheetTitle>Ola</SheetTitle>
-            <SheetDescription>This action cannot benundone</SheetDescription>
-          </SheetHeader>
-        </SheetContent>
-      </SheetHeader>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>Ola</SheetTitle>
+          <SheetDescription>This action cannot benundone</SheetDescription>
+        </SheetHeader>
+        {products.map((product) => (
+          <h1 key={product.id}>
+            {product.name} - {product.quantity}
+          </h1>
+        ))}
+      </SheetContent>
     </Sheet>
   );
 };
