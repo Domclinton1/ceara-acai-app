@@ -18,7 +18,7 @@ const RestaurantPage = async ({ params }: RestaurantPageProps) => {
   }
 
   return (
-    <div className="bg-purple-700 h-screen flex flex-col items-center justify-center px-6 pt-14">
+    <div className="bg-purple-700 h-screen flex flex-col items-center justify-center px-6 ">
       <div className="flex flex-col items-center gap-2">
         <Image
           src="/logo.png"
@@ -40,7 +40,7 @@ const RestaurantPage = async ({ params }: RestaurantPageProps) => {
           praticidade e sabor em cada detalhe
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-4 pt-2">
+      <div className="grid grid-cols-2 gap-4 pt-4">
         <ConsumptionMethodOption
           slug={slug}
           option={"DINE_IN"}

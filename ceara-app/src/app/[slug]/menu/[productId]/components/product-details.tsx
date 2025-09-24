@@ -37,7 +37,7 @@ const ProductDetails = ({ product }: ProductDetailsProps) => {
   };
   return (
     <div className="relative z-50 mt-[-1.5rem] rounded-tl-3xl p-5 flex flex-auto flex-col overflow-hidden">
-      <div className="">
+      <div className="flex-auto">
         {/*RESTAURANTE*/}
         <div className="flex items-center gap-1.5">
           <Image
@@ -55,7 +55,7 @@ const ProductDetails = ({ product }: ProductDetailsProps) => {
         <h2 className="mt-1 text-xl font-semibold">{product.name}</h2>
 
         {/*pREÇO E QUANTIDADE*/}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mt-3">
           <h3 className="text-xl font-semibold">
             {formatCurrency(product.price)}
           </h3>
@@ -77,28 +77,27 @@ const ProductDetails = ({ product }: ProductDetailsProps) => {
             </Button>
           </div>
         </div>
-
-        <ScrollArea className="h-full">
-          {/*SOBRE*/}
-          <div className="mt-6 space-y-3">
-            <h4 className="font-semibold">Sobre</h4>
-            <p className="text-sm text-muted-foreground">
-              {product.description}
-            </p>
-          </div>
-
-          {/*INGREDIENTES*/}
-          <div className="mt-6 space-y-3">
-            <div className="flex items-center gap-1">
-              <ChefHatIcon size={18} />
-              <h4 className="font-semibold">Ingredientes</h4>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {product.ingredients}
-            </p>
-          </div>
-        </ScrollArea>
       </div>
+      <ScrollArea className="h-full">
+        {/*SOBRE*/}
+        <div className="mt-6 space-y-3">
+          <h4 className="font-semibold">Sobre</h4>
+          <p className="text-sm text-muted-foreground">{product.description}</p>
+        </div>
+
+        {/*INGREDIENTES*/}
+        <div className="mt-6 space-y-3">
+          <div className="flex items-center gap-1">
+            <ChefHatIcon size={18} />
+            <h4 className="font-semibold">Ingredientes</h4>
+          </div>
+          <ul className="list-disc px-5 text-sm text-muted-foreground">
+            {product.ingredients.map((ingredient) => (
+              <li key={ingredient}>{ingredient}</li>
+            ))}
+          </ul>
+        </div>
+      </ScrollArea>
       <Button className="rounded-full w-full mt-6">Adcionar à sacola</Button>
     </div>
   );
