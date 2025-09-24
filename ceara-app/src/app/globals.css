@@ -50,10 +50,13 @@
 
 @layer base {
   * {
-    @apply box-border;
+    @apply border-border;
   }
 
   body {
-    @apply text-foreground antialiased;
+    @apply text-foreground antialiased h-full;
+  }
+  html {
+    @apply h-full;
   }
 }
