@@ -12,10 +12,8 @@ const main = async () => {
         name: "Ceara Burguer Açaí",
         slug: "Ceará Açaí Burguer",
         description: "O melhor açaí de Belo Horizonte",
-        avatarImageUrl:
-          "https://u9a6wmr3as.ufs.sh/f/jppBrbk0cChQvcNP9rHlEJu1vCY5kLqzjf29HKaeN78Z6pRy",
-        coverImageUrl:
-          "https://u9a6wmr3as.ufs.sh/f/jppBrbk0cChQac8bHYlkBUjlHSKiuseLm2hIFzVY0OtxEPnw",
+        avatarImageUrl: "/logo.png",
+        coverImageUrl: "/images/banner.webp",
       },
     });
     const combosCategory = await tx.menuCategory.create({
