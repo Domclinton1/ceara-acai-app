@@ -870,7 +870,7 @@ const main = async () => {
         restaurantId: restaurant.id,
       },
     });
-    await tx.product.createManu({
+    await tx.product.createMany({
       data: [
         {
           name: "Batatas Fritas 400gr",
