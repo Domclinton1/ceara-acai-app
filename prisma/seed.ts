@@ -10,7 +10,7 @@ const main = async () => {
     const restaurant = await tx.restaurant.create({
       data: {
         name: "Ceara Burguer Açaí",
-        slug: "Ceará Açaí Burguer",
+        slug: "Ceara-Açai-Burguer",
         description: "O melhor açaí de Belo Horizonte",
         avatarImageUrl: "https://cearaburgueracai.vercel.app/images/logo.webp",
         coverImageUrl: "https://cearaburgueracai.vercel.app/images/banner.webp",
