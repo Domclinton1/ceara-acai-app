@@ -6,5 +6,5 @@
 
 */
 -- AlterTable
-ALTER TABLE "Order" ADD COLUMN     "costumerCpf" TEXT NOT NULL,
-ADD COLUMN     "costumerName" TEXT NOT NULL;
+ALTER TABLE "Order" ADD COLUMN     "customerCpf" TEXT NOT NULL,
+ADD COLUMN     "customerName" TEXT NOT NULL;
