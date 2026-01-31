@@ -7,6 +7,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { startTransition, useContext, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { PatternFormat } from "react-number-format";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -71,7 +72,7 @@ const FinishOrderDialog = ({ open, onOpenChange }: FinishOrderDialogProps) => {
 
   const onSubmit = (data: FormSchema) => {
     const consumptionMethod = searchParams.get(
-      "consumptionMethod"
+      "consumptionMethod",
     ) as ConsumptionMethod;
 
     startTransition(async () => {
@@ -84,12 +85,40 @@ const FinishOrderDialog = ({ open, onOpenChange }: FinishOrderDialogProps) => {
           slug,
         });
 
+        // Chamada para criar o pagamento no Mercado Pago
+        const response = await fetch("/api/payments/mercadopago", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            orderId: result.orderId,
+          }),
+        });
+
+        if (!response.ok) {
+          toast.error("Erro ao gerar pagamento PIX. Tente novamente.");
+          return;
+        }
+
+        const paymentData = await response.json();
+
+        // Se for PIX, o Mercado Pago retorna o point_of_interaction com o QR Code
+        if (paymentData.point_of_interaction?.transaction_data?.ticket_url) {
+          // Redireciona para a página de pagamento ou abre o link do ticket
+          window.open(
+            paymentData.point_of_interaction.transaction_data.ticket_url,
+            "_blank",
+          );
+        }
+
         clearCart();
         onOpenChange(false);
-
+        toast.success("Pedido realizado com sucesso!");
         router.push(`/${result.slug}/orders?cpf=${result.cpf}`);
       } catch (error) {
         console.error(error);
+        toast.error("Ocorreu um erro ao finalizar o pedido.");
       }
     });
   };
@@ -134,6 +163,9 @@ const FinishOrderDialog = ({ open, onOpenChange }: FinishOrderDialogProps) => {
                         customInput={Input}
                         placeholder="Digite seu CPF..."
                         {...field}
+                        onValueChange={(values) => {
+                          field.onChange(values.value);
+                        }}
                       />
                     </FormControl>
                     <FormMessage />

@@ -1,46 +1,72 @@
-import { NextResponse } from "next/server";
+import { OrderStatus } from "@prisma/client";
+import { MercadoPagoConfig, Payment } from "mercadopago";
+import { NextRequest, NextResponse } from "next/server";
 
-import { payment } from "@/lib/mercadopago"; // Corrected: Named import for 'payment'
 import { db } from "@/lib/prisma";
 
-export async function POST(req: Request) {
-  const { orderId } = await req.json();
-
-  const order = await db.order.findUnique({
-    where: { id: orderId },
-    include: { restaurant: true },
-  });
-
-  if (!order || !order.restaurant.mercadoPagoUserId) {
-    return NextResponse.json({ error: "Pedido inválido" }, { status: 400 });
-  }
-
+export async function POST(request: NextRequest) {
   try {
-    const response = await payment.create({
-      body: {
-        // Data must be inside 'body' for SDK v2
-        transaction_amount: order.total,
-        description: `Pedido ${order.id}`,
-        payment_method_id: "pix",
-        external_reference: String(order.id), // Fix: Convert order.id to string
-        // application_fee: order.total * 0.1, // Uncomment if authorized and configured
-        notification_url: "./api/webhooks/mercadopago", // Highly recommended for status updates
-        payer: {
-          email: "cliente@email.com", // Use actual customer email if available
-        },
+    const body = await request.json();
+
+    if (body.type !== "payment") {
+      return NextResponse.json({ received: true });
+    }
+
+    const client = new MercadoPagoConfig({
+      accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
+    });
+
+    const payment = new Payment(client);
+
+    const paymentData = await payment.get({
+      id: body.data.id,
+    });
+
+    // external_reference = orderId que você enviou ao criar pagamento
+    const orderId = Number(paymentData.external_reference);
+
+    if (!orderId) {
+      return NextResponse.json({ error: "Invalid order id" }, { status: 400 });
+    }
+
+    let newStatus: OrderStatus;
+
+    // Fix: Use paymentData.status instead of undefined status variable
+    switch (paymentData.status) {
+      case "pending":
+      case "in_process":
+        newStatus = OrderStatus.PENDING;
+        break;
+
+      case "approved":
+        newStatus = OrderStatus.PAID;
+        break;
+
+      case "rejected":
+      case "cancelled":
+      case "refunded":
+        newStatus = OrderStatus.PAYMENT_FAILED;
+        break;
+
+      default:
+        return NextResponse.json({ received: true });
+    }
+
+    await db.order.update({
+      where: {
+        id: orderId,
+      },
+      data: {
+        status: newStatus,
+        paymentId: String(paymentData.id),
       },
     });
 
-    await db.order.update({
-      where: { id: order.id },
-      data: { paymentId: String(response.id) },
-    });
-
-    return NextResponse.json(response);
+    return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("Mercado Pago Error:", error);
+    console.error("Webhook Mercado Pago:", error);
     return NextResponse.json(
-      { error: "Erro ao criar pagamento" },
+      { error: "Internal server error" },
       { status: 500 },
     );
   }
