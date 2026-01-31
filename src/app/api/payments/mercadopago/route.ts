@@ -1,25 +1,34 @@
 import { NextResponse } from "next/server";
 
-import { payment } from "@/lib/mercadopago";
+import mercadopago from "@/lib/mercadopago";
+import { db } from "@/lib/prisma";
 
 export async function POST(req: Request) {
-  try {
-    const body = await req.json();
+  const { orderId } = await req.json();
 
-    const result = await payment.create({
-      body: {
-        transaction_amount: body.amount,
-        description: "Pedido do app",
-        payment_method_id: body.method,
-        payer: {
-          email: body.email,
-        },
-      },
-    });
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    include: { restaurant: true },
+  });
 
-    return NextResponse.json(result);
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Erro Mercado Pago" }, { status: 500 });
+  if (!order || !order.restaurant.mercadoPagoUserId) {
+    return NextResponse.json({ error: "Pedido inválido" }, { status: 400 });
   }
+
+  const payment = await mercadopago.payment.create({
+    transaction_amount: order.total,
+    description: `Pedido ${order.id}`,
+    payment_method_id: "pix",
+    external_reference: order.id,
+    application_fee: order.total * 0.1,
+    collector_id: order.restaurant.mercadoPagoUserId,
+    payer: { email: "cliente@email.com" },
+  });
+
+  await db.order.update({
+    where: { id: order.id },
+    data: { paymentId: String(payment.body.id) },
+  });
+
+  return NextResponse.json(payment.body);
 }

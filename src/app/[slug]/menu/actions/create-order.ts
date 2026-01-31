@@ -46,15 +46,17 @@ export const createOrder = async (input: CreateOrderInput) => {
       status: "PENDING",
       customerName: input.customerName,
       customerCpf: removeCpfPonctuation(input.customerCpf),
+      orderProducts: {
+        createMany: {
+          data: productsWithPricesAndQuantities,
+        },
+      },
       total: productsWithPricesAndQuantities.reduce(
         (acc, product) => acc + product.price * product.quantity,
         0,
       ),
       consumptionMethod: input.consumptionMethod,
       restaurantId: restaurant.id,
-      orderProducts: {
-        create: productsWithPricesAndQuantities,
-      },
     },
   });
 

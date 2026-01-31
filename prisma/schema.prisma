@@ -96,6 +96,7 @@ enum OrderStatus {
   PAYMENT_CONFIRMED
   PAYMENT_FAILED
   FINISHED
+  PAID
 }
 
 enum ConsumptionMethod {
