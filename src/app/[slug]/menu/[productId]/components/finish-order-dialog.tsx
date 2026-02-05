@@ -4,7 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ConsumptionMethod } from "@prisma/client";
 import { Loader2Icon } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { startTransition, useContext, useTransition } from "react";
+import {
+  startTransition,
+  useContext,
+  useEffect,
+  useState,
+  useTransition,
+} from "react";
 import { useForm } from "react-hook-form";
 import { PatternFormat } from "react-number-format";
 import { toast } from "sonner";
@@ -19,7 +25,6 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
 } from "@/components/ui/drawer";
 import {
   Form,
@@ -36,39 +41,46 @@ import { CartContext } from "../../contexts/cart";
 import { isValidCpf } from "../../helpers/cpf";
 
 const formSchema = z.object({
-  name: z.string().trim().min(1, {
-    message: "O nome é obrigatório.",
-  }),
-  cpf: z
-    .string()
-    .trim()
-    .min(1, { message: "O CPF é obrigatório." })
-    .refine((value) => isValidCpf(value), {
-      message: "CPF inválido.",
-    }),
+  name: z.string().min(1, "O nome é obrigatório"),
+  cpf: z.string().refine(isValidCpf, "CPF inválido"),
 });
 
 type FormSchema = z.infer<typeof formSchema>;
+type PaymentMethod = "PIX" | "CARD";
 
 interface FinishOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-const FinishOrderDialog = ({ open, onOpenChange }: FinishOrderDialogProps) => {
+export default function FinishOrderDialog({
+  open,
+  onOpenChange,
+}: FinishOrderDialogProps) {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
-  const { products, clearCart } = useContext(CartContext);
   const searchParams = useSearchParams();
+  const { products, clearCart } = useContext(CartContext);
+
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("PIX");
+  const [pixQrCode, setPixQrCode] = useState<string | null>(null);
   const [isPending] = useTransition();
 
   const form = useForm<FormSchema>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      cpf: "",
-    },
   });
+
+  // SDK Mercado Pago (necessário para cartão)
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://sdk.mercadopago.com/js/v2";
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
 
   const onSubmit = (data: FormSchema) => {
     const consumptionMethod = searchParams.get(
@@ -77,7 +89,8 @@ const FinishOrderDialog = ({ open, onOpenChange }: FinishOrderDialogProps) => {
 
     startTransition(async () => {
       try {
-        const result = await createOrder({
+        // 1️⃣ Cria pedido
+        const order = await createOrder({
           consumptionMethod,
           customerCpf: data.cpf,
           customerName: data.name,
@@ -85,66 +98,93 @@ const FinishOrderDialog = ({ open, onOpenChange }: FinishOrderDialogProps) => {
           slug,
         });
 
-        // Chamada para criar o pagamento no Mercado Pago
+        // 2️⃣ Cria pagamento
         const response = await fetch("/api/payments/mercadopago", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            orderId: result.orderId,
+            orderId: order.orderId,
+            method: paymentMethod,
+            payer: {
+              name: data.name,
+              email: "clintindossites@gmail.com",
+              cpf: data.cpf,
+            },
           }),
         });
 
         if (!response.ok) {
-          toast.error("Erro ao gerar pagamento PIX. Tente novamente.");
+          throw new Error("Erro no pagamento");
+        }
+
+        const payment = await response.json();
+
+        // 🟢 PIX
+        if (paymentMethod === "PIX") {
+          setPixQrCode(
+            payment.point_of_interaction?.transaction_data?.qr_code_base64,
+          );
+          toast.success("PIX gerado");
           return;
         }
 
-        const paymentData = await response.json();
-
-        // Se for PIX, o Mercado Pago retorna o point_of_interaction com o QR Code
-        if (paymentData.point_of_interaction?.transaction_data?.ticket_url) {
-          // Redireciona para a página de pagamento ou abre o link do ticket
-          window.open(
-            paymentData.point_of_interaction.transaction_data.ticket_url,
-            "_blank",
-          );
-        }
-
+        // 🔵 Cartão (quando implementar token)
+        toast.success("Pagamento aprovado!");
         clearCart();
         onOpenChange(false);
-        toast.success("Pedido realizado com sucesso!");
-        router.push(`/${result.slug}/orders?cpf=${result.cpf}`);
-      } catch (error) {
-        console.error(error);
-        toast.error("Ocorreu um erro ao finalizar o pedido.");
+        router.push(`/${order.slug}/orders?cpf=${order.cpf}`);
+      } catch (err) {
+        console.error(err);
+        toast.error("Erro ao finalizar pedido");
       }
     });
   };
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerTrigger asChild />
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle>Finalizar Pedido</DrawerTitle>
           <DrawerDescription>
-            Insira suas informações abaixo para finalizar o seu pedido.
+            Preencha os dados para finalizar
           </DrawerDescription>
         </DrawerHeader>
 
-        <div className="p-5">
+        <div className="flex gap-2 px-4">
+          <Button
+            variant={paymentMethod === "PIX" ? "default" : "outline"}
+            onClick={() => setPaymentMethod("PIX")}
+          >
+            PIX
+          </Button>
+          <Button
+            variant={paymentMethod === "CARD" ? "default" : "outline"}
+            onClick={() => setPaymentMethod("CARD")}
+          >
+            Cartão
+          </Button>
+        </div>
+
+        {pixQrCode && (
+          <div className="flex justify-center p-4">
+            <image
+              href={`data:image/png;base64,${pixQrCode}`}
+              className="w-52 h-52"
+            />
+          </div>
+        )}
+
+        <div className="p-4">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)}>
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Seu nome</FormLabel>
+                    <FormLabel>Nome</FormLabel>
                     <FormControl>
-                      <Input placeholder="Digite seu nome..." {...field} />
+                      <Input {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -156,16 +196,12 @@ const FinishOrderDialog = ({ open, onOpenChange }: FinishOrderDialogProps) => {
                 name="cpf"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Seu CPF</FormLabel>
+                    <FormLabel>CPF</FormLabel>
                     <FormControl>
                       <PatternFormat
                         format="###.###.###-##"
                         customInput={Input}
-                        placeholder="Digite seu CPF..."
-                        {...field}
-                        onValueChange={(values) => {
-                          field.onChange(values.value);
-                        }}
+                        onValueChange={(v) => field.onChange(v.value)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -174,12 +210,7 @@ const FinishOrderDialog = ({ open, onOpenChange }: FinishOrderDialogProps) => {
               />
 
               <DrawerFooter>
-                <Button
-                  type="submit"
-                  variant="destructive"
-                  className="rounded-full"
-                  disabled={isPending}
-                >
+                <Button type="submit" disabled={isPending}>
                   {isPending && (
                     <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
                   )}
@@ -187,9 +218,7 @@ const FinishOrderDialog = ({ open, onOpenChange }: FinishOrderDialogProps) => {
                 </Button>
 
                 <DrawerClose asChild>
-                  <Button variant="outline" className="w-full rounded-full">
-                    Cancelar
-                  </Button>
+                  <Button variant="outline">Cancelar</Button>
                 </DrawerClose>
               </DrawerFooter>
             </form>
@@ -198,6 +227,4 @@ const FinishOrderDialog = ({ open, onOpenChange }: FinishOrderDialogProps) => {
       </DrawerContent>
     </Drawer>
   );
-};
-
-export default FinishOrderDialog;
+}
