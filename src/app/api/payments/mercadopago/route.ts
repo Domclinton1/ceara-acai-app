@@ -6,43 +6,49 @@ const client = new MercadoPagoConfig({
 });
 
 export async function POST(req: Request) {
-  const { method, orderId, cpf } = await req.json();
+  try {
+    const { method, orderId, payer } = await req.json();
 
-  const payment = new Payment(client);
+    if (!method || !orderId || !payer?.email || !payer?.cpf) {
+      return NextResponse.json(
+        { error: "Dados obrigatórios ausentes" },
+        { status: 400 },
+      );
+    }
 
-  // PIX
-  if (method === "PIX") {
-    const response = await payment.create({
-      body: {
-        transaction_amount: 100,
-        description: `Pedido ${orderId}`,
-        payment_method_id: "pix",
-        payer: {
-          identification: {
-            type: "CPF",
-            number: cpf,
+    const payment = new Payment(client);
+
+    // =====================
+    // PIX
+    // =====================
+    if (method === "PIX") {
+      const response = await payment.create({
+        body: {
+          transaction_amount: 100, // ajuste para o total do pedido
+          payment_method_id: "pix",
+          description: `Pedido ${orderId}`,
+          payer: {
+            email: payer.email,
+            identification: {
+              type: "CPF",
+              number: payer.cpf,
+            },
           },
         },
-      },
-    });
+      });
 
-    return NextResponse.json(response);
-  }
+      return NextResponse.json(response);
+    }
 
-  // Cartão (token vem do frontend)
-  if (method === "CARD") {
-    const response = await payment.create({
-      body: {
-        transaction_amount: 100,
-        token: "CARD_TOKEN",
-        installments: 1,
-        payment_method_id: "visa",
-        payer: {
-          email: "cliente@email.com",
-        },
-      },
-    });
-
-    return NextResponse.json(response);
+    return NextResponse.json(
+      { error: "Método de pagamento inválido" },
+      { status: 400 },
+    );
+  } catch (error) {
+    console.error("Erro Mercado Pago:", error);
+    return NextResponse.json(
+      { error: "Erro interno ao criar pagamento" },
+      { status: 500 },
+    );
   }
 }
