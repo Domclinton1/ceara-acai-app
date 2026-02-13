@@ -6,7 +6,14 @@ const useMercadoPago = () => {
   const router = useRouter();
 
   useEffect(() => {
-    initMercadoPago(process.env.NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY!);
+    const publicKey = process.env.NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY;
+    if (publicKey) {
+      initMercadoPago(publicKey);
+    } else {
+      console.warn(
+        "Mercado Pago Public Key não encontrada nas variáveis de ambiente.",
+      );
+    }
   }, []);
 
   async function createMercadoPagoCheckout(checkoutData: any) {
@@ -19,11 +26,21 @@ const useMercadoPago = () => {
         body: JSON.stringify(checkoutData),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao criar checkout");
+      }
+
       const data = await response.json();
 
-      router.push(data.initPoint);
+      if (data.initPoint) {
+        router.push(data.initPoint);
+      } else {
+        throw new Error("URL de checkout não recebida");
+      }
     } catch (error) {
-      console.log(error);
+      console.error("Erro no Hook Mercado Pago:", error);
+      throw error; // Repassa o erro para ser tratado no componente
     }
   }
 

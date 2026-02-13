@@ -4,75 +4,67 @@ import { NextRequest, NextResponse } from "next/server";
 import mpClient from "@/lib/mercadopago";
 
 export async function POST(req: NextRequest) {
-  const { orderId, method, payer, products } = await req.json();
-
   try {
+    const body = await req.json();
+    console.log("Recebido na API Mercado Pago:", JSON.stringify(body, null, 2));
+
+    const { orderId, method, payer, products } = body;
+
+    if (!orderId) {
+      console.error("Erro: orderId ausente");
+      return NextResponse.json({ error: "orderId ausente" }, { status: 400 });
+    }
+    if (!products || products.length === 0) {
+      console.error("Erro: produtos ausentes");
+      return NextResponse.json({ error: "produtos ausentes" }, { status: 400 });
+    }
+
     const preference = new Preference(mpClient);
 
-    const createdPreference = await preference.create({
+    const preferenceData = {
       body: {
-        external_reference: orderId, // IMPORTANTE: Isso aumenta a pontuação da sua integração com o Mercado Pago - É o id da compra no nosso sistema
+        external_reference: String(orderId),
         metadata: {
           order_id: orderId,
           payment_method: method,
         },
         payer: {
-          email: payer.email,
-          first_name: payer.name.split(" ")[0],
-          last_name: payer.name.split(" ").slice(1).join(" "),
+          email: payer.email || "cliente@exemplo.com",
+          name: payer.name,
           identification: {
             type: "CPF",
-            number: payer.cpf,
+            number: payer.cpf.replace(/\D/g, ""),
           },
         },
         items: products.map((product: any) => ({
-          id: product.id,
-          description: product.name,
+          id: String(product.id),
           title: product.name,
-          quantity: product.quantity,
-          unit_price: product.price,
+          quantity: Number(product.quantity),
+          unit_price: Number(product.price),
           currency_id: "BRL",
-          category_id: "food", // Pode ser ajustado conforme a categoria real do produto
         })),
-        payment_methods: {
-          // Descomente para desativar métodos de pagamento
-          //   excluded_payment_methods: [
-          //     {
-          //       id: "bolbradesco",
-          //     },
-          //     {
-          //       id: "pec",
-          //     },
-          //   ],
-          //   excluded_payment_types: [
-          //     {
-          //       id: "debit_card",
-          //     },
-          //     {
-          //       id: "credit_card",
-          //     },
-          //   ],
-          installments: 12, // Número máximo de parcelas permitidas - calculo feito automaticamente
-        },
         auto_return: "approved",
         back_urls: {
           success: `${req.headers.get("origin")}/?status=sucesso`,
           failure: `${req.headers.get("origin")}/?status=falha`,
-          pending: `${req.headers.get("origin")}/api/mercado-pago/pending`, // Criamos uma rota para lidar com pagamentos pendentes
+          pending: `${req.headers.get("origin")}/?status=pendente`,
         },
       },
-    });
+    };
 
-    if (!createdPreference.id) {
-      throw new Error("No preferenceID");
-    }
+    console.log("Criando preferência no Mercado Pago...");
+    const createdPreference = await preference.create(preferenceData);
+    console.log("Preferência criada com sucesso:", createdPreference.id);
 
     return NextResponse.json({
       preferenceId: createdPreference.id,
       initPoint: createdPreference.init_point,
     });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.error();
+  } catch (err: any) {
+    console.error("Erro detalhado na API do Mercado Pago:", err);
+    return NextResponse.json(
+      { error: err.message || "Erro interno no servidor" },
+      { status: 500 },
+    );
   }
 }

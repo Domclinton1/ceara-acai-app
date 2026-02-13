@@ -4,13 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ConsumptionMethod } from "@prisma/client";
 import { Loader2Icon } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import {
-  startTransition,
-  useContext,
-  useEffect,
-  useState,
-  useTransition,
-} from "react";
+import { useContext, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { PatternFormat } from "react-number-format";
 import { toast } from "sonner";
@@ -64,25 +58,16 @@ export default function FinishOrderDialog({
   const { products, clearCart } = useContext(CartContext);
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("PIX");
-  const [pixQrCode, setPixQrCode] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const { createMercadoPagoCheckout } = useMercadoPago();
 
   const form = useForm<FormSchema>({
     resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      cpf: "",
+    },
   });
-
-  // SDK Mercado Pago (necessário para cartão)
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://sdk.mercadopago.com/js/v2";
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
 
   const onSubmit = (data: FormSchema) => {
     const consumptionMethod = searchParams.get(
@@ -91,83 +76,49 @@ export default function FinishOrderDialog({
 
     startTransition(async () => {
       try {
-        // 1️⃣ Cria pedido
+        console.log("Iniciando criação do pedido...");
+
+        // 1️⃣ Cria pedido no banco de dados
         const order = await createOrder({
           consumptionMethod,
           customerCpf: data.cpf,
           customerName: data.name,
-          products,
+          products: products.map((p) => ({ id: p.id, quantity: p.quantity })),
           slug,
         });
 
-        // 2️⃣ Cria pagamento
-        if (paymentMethod === "CARD") {
-          await createMercadoPagoCheckout({
-            orderId: order.orderId,
-            method: paymentMethod,
-            payer: {
-              name: data.name,
-              email: "clintindossites@gmail.com", // Substitua por um email real ou obtenha do usuário
-              cpf: data.cpf,
-            },
-            products: products.map((p) => ({
-              id: p.id,
-              quantity: p.quantity,
-              price: p.price,
-              name: p.name,
-              imageUrl: p.imageUrl,
-            })),
-          });
-          clearCart();
-          onOpenChange(false);
-          return;
-        }
+        console.log("Pedido criado com sucesso:", order);
 
-        const response = await fetch("/api/mercado-pago/create-checkout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            orderId: order.orderId,
-            method: paymentMethod,
-            payer: {
-              name: data.name,
-              email: "clintindossites@gmail.com", // Substitua por um email real ou obtenha do usuário
-              cpf: data.cpf,
-            },
-            products: products.map((p) => ({
-              id: p.id,
-              quantity: p.quantity,
-              price: p.price,
-              name: p.name,
-              imageUrl: p.imageUrl,
-            })),
-          }),
-        });
+        // 2️⃣ Chama a API de Checkout do Mercado Pago
+        // IMPORTANTE: A action createOrder retorna 'orderId', não 'id'
+        const checkoutData = {
+          orderId: order.orderId,
+          method: paymentMethod,
+          payer: {
+            name: data.name,
+            email: "domlinksolucoesdigitais@gmail.com",
+            cpf: data.cpf,
+          },
+          products: products.map((p) => ({
+            id: p.id,
+            quantity: p.quantity,
+            price: p.price,
+            name: p.name,
+          })),
+        };
 
-        if (!response.ok) {
-          throw new Error("Erro no pagamento");
-        }
+        console.log("Enviando dados para o checkout:", checkoutData);
 
-        const payment = await response.json();
+        await createMercadoPagoCheckout(checkoutData);
 
-        // 🟢 PIX
-        if (paymentMethod === "PIX") {
-          setPixQrCode(
-            payment.point_of_interaction?.transaction_data?.qr_code_base64,
-          );
-          toast.success("PIX gerado");
-          return;
-        }
-
-        // 🔵 Cartão (quando implementar token)
-        // A lógica para cartão agora é tratada pelo createMercadoPagoCheckout
-        toast.success("Pagamento aprovado!");
         clearCart();
         onOpenChange(false);
-        router.push(`/${order.slug}/orders?cpf=${order.cpf}`);
+        toast.success("Redirecionando para o pagamento...");
       } catch (err) {
-        console.error(err);
-        toast.error("Erro ao finalizar pedido");
+        console.error("Erro detalhado no onSubmit:", err);
+        toast.error(
+          "Erro ao processar o pedido. Verifique o console para mais detalhes.",
+        );
       }
     });
   };
@@ -178,18 +129,20 @@ export default function FinishOrderDialog({
         <DrawerHeader>
           <DrawerTitle>Finalizar Pedido</DrawerTitle>
           <DrawerDescription>
-            Preencha os dados para finalizar
+            Escolha a forma de pagamento e preencha seus dados.
           </DrawerDescription>
         </DrawerHeader>
 
-        <div className="flex gap-2 px-4">
+        <div className="flex gap-2 px-4 mb-4">
           <Button
+            className="flex-1"
             variant={paymentMethod === "PIX" ? "default" : "outline"}
             onClick={() => setPaymentMethod("PIX")}
           >
             PIX
           </Button>
           <Button
+            className="flex-1"
             variant={paymentMethod === "CARD" ? "default" : "outline"}
             onClick={() => setPaymentMethod("CARD")}
           >
@@ -197,26 +150,17 @@ export default function FinishOrderDialog({
           </Button>
         </div>
 
-        {pixQrCode && (
-          <div className="flex justify-center p-4">
-            <image
-              href={`data:image/png;base64,${pixQrCode}`}
-              className="w-52 h-52"
-            />
-          </div>
-        )}
-
         <div className="p-4">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nome</FormLabel>
+                    <FormLabel>Nome Completo</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input placeholder="Digite seu nome..." {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -233,7 +177,9 @@ export default function FinishOrderDialog({
                       <PatternFormat
                         format="###.###.###-##"
                         customInput={Input}
+                        placeholder="000.000.000-00"
                         onValueChange={(v) => field.onChange(v.value)}
+                        value={field.value}
                       />
                     </FormControl>
                     <FormMessage />
@@ -241,16 +187,18 @@ export default function FinishOrderDialog({
                 )}
               />
 
-              <DrawerFooter>
-                <Button type="submit" disabled={isPending}>
+              <DrawerFooter className="px-0">
+                <Button type="submit" disabled={isPending} className="w-full">
                   {isPending && (
                     <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  Finalizar pedido
+                  Finalizar e Pagar
                 </Button>
 
                 <DrawerClose asChild>
-                  <Button variant="outline">Cancelar</Button>
+                  <Button variant="outline" className="w-full">
+                    Cancelar
+                  </Button>
                 </DrawerClose>
               </DrawerFooter>
             </form>
