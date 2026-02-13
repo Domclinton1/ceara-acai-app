@@ -16,6 +16,7 @@ import { PatternFormat } from "react-number-format";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import useMercadoPago from "@/app/hooks/useMercadoPago";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -64,7 +65,8 @@ export default function FinishOrderDialog({
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("PIX");
   const [pixQrCode, setPixQrCode] = useState<string | null>(null);
-  const [isPending] = useTransition();
+  const [isPending, startTransition] = useTransition();
+  const { createMercadoPagoCheckout } = useMercadoPago();
 
   const form = useForm<FormSchema>({
     resolver: zodResolver(formSchema),
@@ -99,7 +101,29 @@ export default function FinishOrderDialog({
         });
 
         // 2️⃣ Cria pagamento
-        const response = await fetch("/api/payments/mercadopago", {
+        if (paymentMethod === "CARD") {
+          await createMercadoPagoCheckout({
+            orderId: order.orderId,
+            method: paymentMethod,
+            payer: {
+              name: data.name,
+              email: "clintindossites@gmail.com", // Substitua por um email real ou obtenha do usuário
+              cpf: data.cpf,
+            },
+            products: products.map((p) => ({
+              id: p.id,
+              quantity: p.quantity,
+              price: p.price,
+              name: p.name,
+              imageUrl: p.imageUrl,
+            })),
+          });
+          clearCart();
+          onOpenChange(false);
+          return;
+        }
+
+        const response = await fetch("/api/mercado-pago/create-checkout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -107,9 +131,16 @@ export default function FinishOrderDialog({
             method: paymentMethod,
             payer: {
               name: data.name,
-              email: "clintindossites@gmail.com",
+              email: "clintindossites@gmail.com", // Substitua por um email real ou obtenha do usuário
               cpf: data.cpf,
             },
+            products: products.map((p) => ({
+              id: p.id,
+              quantity: p.quantity,
+              price: p.price,
+              name: p.name,
+              imageUrl: p.imageUrl,
+            })),
           }),
         });
 
@@ -129,6 +160,7 @@ export default function FinishOrderDialog({
         }
 
         // 🔵 Cartão (quando implementar token)
+        // A lógica para cartão agora é tratada pelo createMercadoPagoCheckout
         toast.success("Pagamento aprovado!");
         clearCart();
         onOpenChange(false);

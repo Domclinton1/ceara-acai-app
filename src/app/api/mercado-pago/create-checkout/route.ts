@@ -1,39 +1,39 @@
-import { NextRequest, NextResponse } from "next/server";
 import { Preference } from "mercadopago";
-import mpClient from "@/app/lib/mercado-pago";
+import { NextRequest, NextResponse } from "next/server";
+
+import mpClient from "@/lib/mercadopago";
 
 export async function POST(req: NextRequest) {
-  const { testeId, userEmail } = await req.json();
+  const { orderId, method, payer, products } = await req.json();
 
   try {
     const preference = new Preference(mpClient);
 
     const createdPreference = await preference.create({
       body: {
-        external_reference: testeId, // IMPORTANTE: Isso aumenta a pontuação da sua integração com o Mercado Pago - É o id da compra no nosso sistema
+        external_reference: orderId, // IMPORTANTE: Isso aumenta a pontuação da sua integração com o Mercado Pago - É o id da compra no nosso sistema
         metadata: {
-          testeId, // O Mercado Pago converte para snake_case, ou seja, testeId vai virar teste_id
-          // userEmail: userEmail,
-          // plan: '123'
-          //etc
+          order_id: orderId,
+          payment_method: method,
         },
-        ...(userEmail && {
-          payer: {
-            email: userEmail,
+        payer: {
+          email: payer.email,
+          first_name: payer.name.split(" ")[0],
+          last_name: payer.name.split(" ").slice(1).join(" "),
+          identification: {
+            type: "CPF",
+            number: payer.cpf,
           },
-        }),
-
-        items: [
-          {
-            id: "id-do-seu-produto",
-            description: "Descrição do produto",
-            title: "Nome do produto",
-            quantity: 1,
-            unit_price: 9.99,
-            currency_id: "BRL",
-            category_id: "category", // Recomendado inserir, mesmo que não tenha categoria - Aumenta a pontuação da sua integração com o Mercado Pago
-          },
-        ],
+        },
+        items: products.map((product: any) => ({
+          id: product.id,
+          description: product.name,
+          title: product.name,
+          quantity: product.quantity,
+          unit_price: product.price,
+          currency_id: "BRL",
+          category_id: "food", // Pode ser ajustado conforme a categoria real do produto
+        })),
         payment_methods: {
           // Descomente para desativar métodos de pagamento
           //   excluded_payment_methods: [

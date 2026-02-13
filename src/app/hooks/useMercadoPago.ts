@@ -1,6 +1,6 @@
-import { useEffect } from "react";
 import { initMercadoPago } from "@mercadopago/sdk-react";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 const useMercadoPago = () => {
   const router = useRouter();
