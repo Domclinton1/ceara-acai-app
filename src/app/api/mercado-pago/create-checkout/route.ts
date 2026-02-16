@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
           payment_method: method,
         },
         payer: {
-          email: payer.email || "cliente@exemplo.com",
+          email: payer.email || "domlinksolucoesdigitais@gmail.com",
           name: payer.name,
           identification: {
             type: "CPF",
